@@ -3,7 +3,7 @@ uvicorn[standard]==0.34.0
 pydantic==2.10.6
 sqlalchemy==2.0.38
 slowapi==0.1.9
-llama-cpp-python==0.3.7
+llama-cpp-python==0.2.75
 edge-tts==6.1.19
 python-multipart==0.0.20
 orjson==3.10.15

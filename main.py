@@ -33,7 +33,7 @@ SYSTEM_PROMPT = (
     "prompt patterns, reject any out-of-scope non-brand prompts gracefully, and seamlessly "
     "interface context details using the active session database history arrays provided."
 )
-MODEL_PATH = Path(r"D:\Models Library\gemma-2-2b-it-Q4_K_M.gguf")
+MODEL_PATH = r"D:\Models Library\gemma-2-2b-it-Q4_K_M.gguf"
 AUTHORIZED_ORIGINS = ["http://127.0.0.1:8000", "http://localhost:8000"]
 
 limiter = Limiter(key_func=get_remote_address)
@@ -43,16 +43,18 @@ limiter = Limiter(key_func=get_remote_address)
 async def lifespan(app: FastAPI):
     init_db()
 
-    resolved_path = Path(os.getenv("JAI_MODEL_PATH", str(MODEL_PATH))).expanduser()
-    if not resolved_path.exists():
+    raw_model_path = os.getenv("JAI_MODEL_PATH", MODEL_PATH).strip().strip("\"'")
+    resolved_path = Path(raw_model_path).expanduser()
+    if not resolved_path.is_file():
         raise RuntimeError(
-            f"GGUF model file not found at: {resolved_path}. "
-            "Set JAI_MODEL_PATH env var if your model is at a different location."
+            "GGUF model file not found. "
+            f"Checked path: {resolved_path}. "
+            "For Windows CMD use: set JAI_MODEL_PATH=D:\\Models Library\\gemma-2-2b-it-Q4_K_M.gguf"
         )
 
-    # 0.2.75 compatible conservative config for non-AVX2 CPUs.
+    # llama-cpp-python 0.2.75 compatible config for non-AVX2 CPUs.
     app.state.llm = Llama(
-        model_path=str(resolved_path),
+        model_path=str(resolved_path.resolve()),
         n_ctx=4096,
         n_threads=max(4, os.cpu_count() or 4),
         n_batch=128,
