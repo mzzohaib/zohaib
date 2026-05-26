@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>J. AI Corporate Assistant</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside id="sidebar" class="sidebar">
+      <div class="brand">
+        <div class="logo">J.</div>
+        <div>
+          <h1>AI Support Desk</h1>
+          <p>Premium Retail Concierge</p>
+        </div>
+      </div>
+      <button id="newChatBtn" class="new-chat-btn">+ New Chat</button>
+      <section>
+        <h2>Recent Conversations</h2>
+        <ul id="sessionList" class="session-list"></ul>
+      </section>
+    </aside>
+
+    <main class="chat-pane">
+      <header class="topbar">
+        <button id="sidebarToggle" class="icon-btn">☰</button>
+        <div class="status">Local GGUF Runtime: Connected</div>
+      </header>
+
+      <section id="chatViewport" class="chat-viewport"></section>
+
+      <form id="chatForm" class="composer" autocomplete="off">
+        <textarea id="messageInput" maxlength="500" placeholder="Ask about orders, exchanges, outlets, or delivery..." required></textarea>
+        <div class="composer-actions">
+          <button id="micBtn" type="button" class="icon-btn mic-btn">🎙️</button>
+          <button type="submit" class="send-btn">Send</button>
+        </div>
+      </form>
+    </main>
+  </div>
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>
