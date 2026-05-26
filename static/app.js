@@ -1,158 +1,46 @@
-const chatViewport = document.getElementById('chatViewport');
-const chatForm = document.getElementById('chatForm');
-const messageInput = document.getElementById('messageInput');
-const sessionList = document.getElementById('sessionList');
-const newChatBtn = document.getElementById('newChatBtn');
-const micBtn = document.getElementById('micBtn');
-const sidebar = document.getElementById('sidebar');
-const sidebarToggle = document.getElementById('sidebarToggle');
+const el = (id) => document.getElementById(id);
+const chatViewport = el('chatViewport');
+let sessionId = crypto.randomUUID().replaceAll('-', '_');
+let language = 'ur-PK';
+let lastPrompt = '';
 
-let currentSessionId = crypto.randomUUID().replaceAll('-', '_');
-let lastUserPrompt = '';
+async function api(path, options = {}) { const r = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...options }); if (!r.ok) throw new Error(await r.text()); return r.json(); }
 
-async function api(path, options = {}) {
-  const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err || 'Request failed');
-  }
-  return res.json();
-}
-
-function makeUtilityRow(text, audioUrl) {
-  const row = document.createElement('div');
-  row.className = 'utility-row';
-
-  const copyBtn = document.createElement('button');
-  copyBtn.className = 'icon-btn';
-  copyBtn.textContent = 'Copy';
-  copyBtn.onclick = async () => {
-    await navigator.clipboard.writeText(text);
-    copyBtn.textContent = '✓ Copied';
-    setTimeout(() => (copyBtn.textContent = 'Copy'), 1400);
-  };
-
-  const audioBtn = document.createElement('button');
-  audioBtn.className = 'icon-btn';
-  audioBtn.textContent = 'Play Audio';
-  audioBtn.onclick = () => {
-    if (!audioUrl) return;
-    const audio = new Audio(audioUrl);
-    audio.play();
-  };
-
-  const regenBtn = document.createElement('button');
-  regenBtn.className = 'icon-btn';
-  regenBtn.textContent = 'Regenerate';
-  regenBtn.onclick = () => sendMessage(lastUserPrompt, true);
-
-  row.append(copyBtn, audioBtn, regenBtn);
+function utilRow(msg) {
+  const row = document.createElement('div'); row.className = 'utility-row';
+  const mk = (txt, fn) => { const b = document.createElement('button'); b.className = 'icon-btn'; b.textContent = txt; b.onclick = fn; return b; };
+  row.append(mk('Copy', async (e) => { await navigator.clipboard.writeText(msg.content); e.target.textContent = '✓'; setTimeout(() => e.target.textContent = 'Copy', 1000); }));
+  row.append(mk('Play', () => msg.audio_url && new Audio(msg.audio_url).play()));
+  row.append(mk('Regen', () => send(lastPrompt)));
+  row.append(mk('Like', () => rate(msg.message_id, 5)));
+  row.append(mk('Dislike', () => rate(msg.message_id, 1)));
+  row.append(mk('Edit', async () => { const text = prompt('Edit message', msg.content); if (text) await send(text); }));
+  row.append(mk('Delete', async () => { await api(`/api/sessions/${sessionId}/messages/${msg.message_id}`, { method: 'DELETE' }); await loadMessages(); }));
   return row;
 }
+function render(role, content, msg = {}) { const a = document.createElement('article'); a.className = `message ${role}`; a.innerHTML = `<div>${role}</div><div>${content}</div>`; if (role === 'assistant') a.append(utilRow({ content, ...msg })); chatViewport.append(a); chatViewport.scrollTop = chatViewport.scrollHeight; }
 
-function appendMessage(role, text, audioUrl = null) {
-  const item = document.createElement('article');
-  item.className = `message ${role}`;
+async function loadSessions(query = '') { const data = await api(`/api/sessions${query ? `?query=${encodeURIComponent(query)}` : ''}`); const ul = el('sessionList'); ul.innerHTML = ''; data.sessions.forEach(s => { const li = document.createElement('li'); li.innerHTML = `<span>${s.title}</span><div><button data-id='${s.session_id}' class='pin'>📌</button><button data-id='${s.session_id}' class='open'>↗</button></div>`; ul.append(li); }); ul.querySelectorAll('.open').forEach(b => b.onclick = async () => { sessionId = b.dataset.id; await loadMessages(); }); ul.querySelectorAll('.pin').forEach(b => b.onclick = async () => { await api(`/api/sessions/${b.dataset.id}`, { method: 'PUT', body: JSON.stringify({ pinned: true }) }); await loadSessions(); }); }
+async function loadMessages() { const data = await api(`/api/sessions/${sessionId}/messages`); chatViewport.innerHTML = ''; data.messages.forEach(m => render(m.role, m.content, m)); }
+async function rate(message_id, rating) { await api('/api/feedback', { method: 'POST', body: JSON.stringify({ session_id: sessionId, message_id, rating, comment: '' }) }); }
 
-  const meta = document.createElement('div');
-  meta.className = 'meta';
-  meta.textContent = role === 'user' ? 'You' : 'J. AI Corporate Assistant';
-
-  const body = document.createElement('div');
-  body.textContent = text;
-  item.append(meta, body);
-
-  if (role === 'assistant') item.append(makeUtilityRow(text, audioUrl));
-  chatViewport.appendChild(item);
-  chatViewport.scrollTop = chatViewport.scrollHeight;
+async function send(text) {
+  if (!text?.trim()) return; lastPrompt = text; render('user', text); const sk = document.createElement('div'); sk.className = 'message skeleton'; chatViewport.append(sk);
+  const creativity = Number(el('creativity').value);
+  const result = await api('/api/chat', { method: 'POST', body: JSON.stringify({ session_id: sessionId, message: text.slice(0,500), language, creativity }) });
+  sk.remove(); render('assistant', result.response, result); drawSuggestions(result.suggestions || []); await loadSessions();
 }
+function drawSuggestions(list){ const w = el('suggestions'); w.innerHTML=''; list.forEach(t=>{const c=document.createElement('button');c.className='chip';c.textContent=t;c.onclick=()=>send(t);w.append(c);}); }
 
-async function loadSessions() {
-  const { sessions } = await api('/api/sessions');
-  sessionList.innerHTML = '';
-  sessions.forEach((s) => {
-    const li = document.createElement('li');
-    li.textContent = s.session_id;
-    if (s.session_id === currentSessionId) li.classList.add('active');
-    li.onclick = () => switchSession(s.session_id);
-    sessionList.appendChild(li);
-  });
-}
+el('chatForm').onsubmit = async (e) => { e.preventDefault(); const msg = el('messageInput').value; el('messageInput').value=''; await send(msg); };
+el('newChatBtn').onclick = async () => { sessionId = crypto.randomUUID().replaceAll('-', '_'); chatViewport.innerHTML=''; await loadSessions(); };
+el('searchInput').oninput = async (e) => loadSessions(e.target.value);
+el('exportBtn').onclick = async () => { const data = await api(`/api/sessions/${sessionId}/messages`); const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${sessionId}.json`; a.click(); };
+el('langBtn').onclick = () => { language = language === 'ur-PK' ? 'en-US' : 'ur-PK'; el('langBtn').textContent = `Lang: ${language}`; };
+el('titleInput').onchange = async (e) => { await api(`/api/sessions/${sessionId}`, { method:'PUT', body: JSON.stringify({ title: e.target.value }) }); await loadSessions(); };
+el('sidebarToggle').onclick = () => el('sidebar').classList.toggle('collapsed');
 
-async function switchSession(sessionId) {
-  currentSessionId = sessionId;
-  chatViewport.innerHTML = '';
-  const { messages } = await api(`/api/sessions/${sessionId}/messages`);
-  for (const msg of messages) {
-    appendMessage(msg.role, msg.content);
-  }
-  await loadSessions();
-}
-
-async function sendMessage(text, regenerate = false) {
-  if (!text || !text.trim()) return;
-  lastUserPrompt = text;
-
-  if (!regenerate) appendMessage('user', text);
-  const skeleton = document.createElement('div');
-  skeleton.className = 'message skeleton';
-  chatViewport.appendChild(skeleton);
-
-  try {
-    const result = await api('/api/chat', {
-      method: 'POST',
-      body: JSON.stringify({
-        session_id: currentSessionId,
-        message: text,
-        regenerate,
-      }),
-    });
-    skeleton.remove();
-    appendMessage('assistant', result.response, result.audio_url);
-    await loadSessions();
-  } catch (error) {
-    skeleton.remove();
-    appendMessage('assistant', `Error: ${error.message}`);
-  }
-}
-
-chatForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const text = messageInput.value.slice(0, 500);
-  messageInput.value = '';
-  await sendMessage(text);
-});
-
-newChatBtn.onclick = async () => {
-  currentSessionId = crypto.randomUUID().replaceAll('-', '_');
-  chatViewport.innerHTML = '';
-  await loadSessions();
-};
-
-sidebarToggle.onclick = () => sidebar.classList.toggle('collapsed');
-
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-if (SpeechRecognition) {
-  const recognition = new SpeechRecognition();
-  recognition.lang = 'ur-PK';
-  recognition.continuous = false;
-  recognition.interimResults = false;
-
-  micBtn.onclick = () => {
-    micBtn.classList.add('listening');
-    recognition.start();
-  };
-  recognition.onresult = (event) => {
-    const transcript = event.results[0][0].transcript;
-    messageInput.value = transcript;
-  };
-  recognition.onend = () => micBtn.classList.remove('listening');
-  recognition.onerror = () => micBtn.classList.remove('listening');
-} else {
-  micBtn.disabled = true;
-}
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SR) { const rec = new SR(); rec.lang = 'ur-PK'; rec.onstart = () => el('micBtn').classList.add('listening'); rec.onend = () => el('micBtn').classList.remove('listening'); rec.onresult = (e)=>{el('messageInput').value=e.results[0][0].transcript;}; el('micBtn').onclick=()=>rec.start(); }
 
 loadSessions();
