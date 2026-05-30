@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>J. AI Assistant</title><link rel="stylesheet" href="/static/style.css"/></head>
+<body>
+<div class="app-shell">
+<aside id="sidebar" class="sidebar">
+<div class="brand"><div class="logo">J.</div><div><h1>AI Support Desk</h1><p>Premium Retail Concierge</p></div></div>
+<button id="newChatBtn" class="new-chat-btn">+ New Chat</button>
+<input id="searchInput" placeholder="Search chats/messages" />
+<div class="side-actions"><button id="exportBtn" class="icon-btn">Export JSON</button><button id="langBtn" class="icon-btn">Lang: ur-PK</button></div>
+<ul id="sessionList" class="session-list"></ul>
+</aside>
+<main class="chat-pane">
+<header class="topbar"><button id="sidebarToggle" class="icon-btn">☰</button><div class="status" id="status">Local GGUF Runtime: Connected</div><input id="titleInput" maxlength="180" placeholder="Rename chat title"/></header>
+<section id="suggestions" class="suggestions"></section>
+<section id="chatViewport" class="chat-viewport"></section>
+<form id="chatForm" class="composer" autocomplete="off"><textarea id="messageInput" maxlength="500" required></textarea><div class="composer-actions"><input id="creativity" type="range" min="0" max="1" step="0.1" value="0.5"/><button id="micBtn" type="button" class="icon-btn mic-btn">🎙️</button><button type="submit" class="send-btn">Send</button></div></form>
+</main>
+</div>
+<script type="module" src="/static/app.js"></script>
+</body></html>
